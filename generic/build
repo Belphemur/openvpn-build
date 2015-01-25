@@ -144,7 +144,7 @@ download() {
 		gitDownload ${GIT_FOLDERS["$folder"]} "${SOURCESROOT}/${folder}"
 	done
 
-	if [ "$(ls "${SOURCESROOT}" | wc -l | sed 's/[ \t]//g')" != 7 ]; then
+	if [ "$(ls "${SOURCESROOT}" | wc -l | sed 's/[ \t]//g')" != 6 ]; then
 		die "sources is unclean."
 	fi	
 }
