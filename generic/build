@@ -452,6 +452,16 @@ clean_empty_dirs() {
 pack() {
 	echo "Packing images"
 	local X="${CHOST:-$(gcc -dumpmachine)}"
+	if [ -n "${BUILD_FOR_WINDOWS}" ]
+	then
+		echo "Copy libstdc++ and libgcc"
+		if [ ! -n "${GCC_STD_LIB_PATH}" ]
+		then
+			die "Build for windows but the path to the libgcc and libstdc++ is not set"		
+		fi
+		cp ${GCC_STD_LIB_PATH}/libstdc++*.dll ${OPENVPN_ROOT}/bin/ || die "Can't find the libstdc++"
+		cp ${GCC_STD_LIB_PATH}/libgcc*.dll ${OPENVPN_ROOT}/bin/   || die "Can't find the libgcc"
+	fi
 	(cd "${IMAGEROOT}" && find src ) | bzip2 > "${IMAGEROOT}/openvpn-${X}-${BUILD_VERSION}-srclist.bz2" || die "srclist"
 	tar -cjf "${IMAGEROOT}/openvpn-${X}-${BUILD_VERSION}-src.tar.bz2" -C "${IMAGEROOT}" src || die "src"
 	tar -cjf "${IMAGEROOT}/openvpn-${X}-${BUILD_VERSION}-bin.tar.bz2" -C "${OPENVPN_ROOT}" . || die "openvpn"
