@@ -283,23 +283,6 @@ build_dep() {
 #		[ -n "${SAVE_DEP_CACHE}" ] && depcache_save openssl
 #	fi
 
-#	if [ -n "${USE_DEP_CACHE}" ]; then
-#		depcache_extract polarssl
-#	else
-#		echo "Build polarssl without POLARSSL_PKCS11_C"
-#		cd "${BUILDROOT}/polarssl"* || die "cd polarssl"
-#		scripts/config.pl unset POLARSSL_PKCS11_C
-#		${MAKE} ${MAKEOPTS} lib ${EXTRA_POLARSSL_MAKE} CC=${CHOST}-gcc \
-#		$(empty_ifelse "${DO_STATIC}" "SHARED=true" "") \
-#		  || die "make polarssl"
-#		${MAKE} install DESTDIR="${INSTALL_ROOT}" \
-#		  || die "make install polarssl"
-
-#		fixup_la
-
-#		[ -n "${SAVE_DEP_CACHE}" ] && depcache_save polarssl
-#	fi
-
 	if [ -n "${USE_DEP_CACHE}" ]; then
 		depcache_extract polarssl
 	else
@@ -368,23 +351,7 @@ build_dep() {
 
 		[ -n "${SAVE_DEP_CACHE}" ] && depcache_save pkcs11-helper
 	  fi
-	
-#		if [ -n "${USE_DEP_CACHE}" ]; then
-#			depcache_extract polarssl-pkcs
-#		else
-#			echo "Build polarssl"
-#			cd "${BUILDROOT}/polarssl"* || die "cd polarssl"
-#			${MAKE} clean || die "Can't clean polarssl"
-#			./scripts/config.pl set POLARSSL_PKCS11_C
-#			${MAKE} ${MAKEOPTS} lib ${EXTRA_POLARSSL_MAKE} CFLAGS=${PKCS11_HELPER_CFLAGS} LDFLAGS=${PKCS11_HELPER_LIBS} CC=${CHOST}-gcc \
-#			$(empty_ifelse "${DO_STATIC}" "SHARED=true" "SHARED=false") \
-#			  || die "make polarssl"
-#			${MAKE} install DESTDIR="${INSTALL_ROOT}" \
-#			  || die "make install polarssl"
-#			fixup_la
 
-#			[ -n "${SAVE_DEP_CACHE}" ] && depcache_save polarssl-pkcs
-#		fi
 		if [ -n "${USE_DEP_CACHE}" ]; then
 			depcache_extract polarssl-pkcs
 		else
