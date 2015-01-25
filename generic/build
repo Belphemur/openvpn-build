@@ -459,9 +459,21 @@ copy_docs() {
 copy_sources() {
 	echo "Copying sources"
 	mkdir -p "${IMAGEROOT}/src/patches"
-	cp "${SOURCESROOT}"/* "${IMAGEROOT}/src" || die "sources"
+	pushd ${SOURCESROOT}
+	for source in  "${SOURCESROOT}"/*
+	do
+		if [ -d $source ]
+		then
+			SOURCEDIR=$(basename $source)
+			tar caf ${IMAGEROOT}/src/${SOURCEDIR}.tar.xz ${SOURCEDIR} --exclude=".git" 
+			
+		else
+			cp ${source} "${IMAGEROOT}/src/"
+		fi
+	done
+	popd
 	if [ "$(cd "${PATCHDIR}" && echo *)" != "*" ]; then
-		cp "${PATCHDIR}"/* "${IMAGEROOT}/src/patches" || die "patches"
+		cp -rp "${PATCHDIR}"/* "${IMAGEROOT}/src/patches" || die "patches"
 	fi
 }
 
