@@ -89,6 +89,7 @@ download1() {
 	fi
 }
 gitNeedPull() {
+	${GIT} fetch
 	LOCAL=$(${GIT} rev-parse @{0})
 	BASE=$(${GIT} merge-base @{0} @{u})
 	if  [ "$LOCAL" = "$BASE" ]; then
