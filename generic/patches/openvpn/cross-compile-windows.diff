@@ -1,0 +1,51 @@
+diff --git a/configure.ac b/configure.ac
+index 9132468..ccd8aa0 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -329,6 +329,7 @@ case "$host" in
+                AC_DEFINE_UNQUOTED([TARGET_PREFIX], ["W"], [Target prefix])
+                CPPFLAGS="${CPPFLAGS} -DWIN32_LEAN_AND_MEAN"
+                CPPFLAGS="${CPPFLAGS} -DNTDDI_VERSION=NTDDI_WINXP -D_WIN32_WINNT=_WIN32_WINNT_WINXP"
++               LDFLAGS="${LDFLAGS} -static-libgcc -static-libstdc++"
+                WIN32=yes
+                ;;
+        *-*-dragonfly*)
+@@ -503,6 +504,12 @@ AC_CHECK_TYPE(
+        ,
+        [[${SOCKET_INCLUDES}]]
+ )
++AC_CHECK_MEMBER(
++       [struct in_pktinfo.ipi_spec_dst],
++       [AC_DEFINE(HAVE_IPI_SPEC_DST, 1, [struct in_pktinfo.ipi_spec_dst needed for IP_PKTINFO support])],
++       [],
++       [#include "syshead.h"]
++)
+ AC_CHECK_TYPE(
+         [sa_family_t],
+         [AC_DEFINE([HAVE_SA_FAMILY_T], [1], [sa_family_t, needed to hold AF_* info])],
+diff --git a/src/openvpn/socket.h b/src/openvpn/socket.h
+index 8e157c6..e69d9b3 100644
+--- a/src/openvpn/socket.h
++++ b/src/openvpn/socket.h
+@@ -620,7 +620,7 @@ addr_defined_ipi (const struct link_socket_actual *lsa)
+ #if ENABLE_IP_PKTINFO
+   if (!lsa) return 0;
+   switch (lsa->dest.addr.sa.sa_family) {
+-#ifdef HAVE_IN_PKTINFO
++#if defined(HAVE_IN_PKTINFO) && defined(HAVE_IPI_SPEC_DST)
+     case AF_INET: return lsa->pi.in4.ipi_spec_dst.s_addr != 0;
+ #elif defined(IP_RECVDSTADDR)
+     case AF_INET: return lsa->pi.in4.s_addr != 0;
+diff --git a/src/openvpn/syshead.h b/src/openvpn/syshead.h
+index b898bf2..796886f 100644
+--- a/src/openvpn/syshead.h
++++ b/src/openvpn/syshead.h
+@@ -419,7 +419,7 @@
+  * Does this platform support linux-style IP_PKTINFO
+  * or bsd-style IP_RECVDSTADDR ?
+  */
+-#if defined(ENABLE_MULTIHOME) && ((defined(HAVE_IN_PKTINFO)&&defined(IP_PKTINFO)) || defined(IP_RECVDSTADDR)) && defined(HAVE_MSGHDR) && defined(HAVE_CMSGHDR) && defined(HAVE_IOVEC) && defined(CMSG_FIRSTHDR) && defined(CMSG_NXTHDR) && defined(HAVE_RECVMSG) && defined(HAVE_SENDMSG)
++#if defined(ENABLE_MULTIHOME) && ((defined(HAVE_IN_PKTINFO)&&defined(HAVE_IPI_SPEC_DST)&&defined(IP_PKTINFO)) || defined(IP_RECVDSTADDR)) && defined(HAVE_MSGHDR) && defined(HAVE_CMSGHDR) && defined(HAVE_IOVEC) && defined(CMSG_FIRSTHDR) && defined(CMSG_NXTHDR) && defined(HAVE_RECVMSG) && defined(HAVE_SENDMSG)
+ #define ENABLE_IP_PKTINFO 1
+ #else
+ #define ENABLE_IP_PKTINFO 0

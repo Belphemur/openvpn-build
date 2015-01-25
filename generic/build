@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # OpenVPN Project Cross Compile Build
 # Copyright (C) 2008-2012 Alon Bar-Lev <alon.barlev@gmail.com>
 #
@@ -88,22 +88,65 @@ download1() {
 		geturl ${url} || die "Cannot download ${url}"
 	fi
 }
+gitNeedPull() {
+	LOCAL=$(${GIT} rev-parse @{0})
+	BASE=$(${GIT} merge-base @{0} @{u})
+	if  [ "$LOCAL" = "$BASE" ]; then
+		return 1
+	fi
+	return 0
+	
+}
+
+gitCheckForAutoConf() {
+	GIT_FOLDER=${1}
+	pushd ${GIT_FOLDER}
+	if [ -f "./configure.ac" ] 
+	then		
+		echo "Autoconf ${GIT_FOLDER}"
+		autoreconf -fi || die "Cannot configure ${GIT_FOLDER}"		
+	fi
+	popd
+}
+gitDownload() {
+	GIT_URL=${1}
+	GIT_FOLDER=${2}
+	echo "Cloning ${GIT_URL}"
+	if [ -d "${GIT_FOLDER}/.git" ] 
+	then
+		pushd ${GIT_FOLDER}
+		if [[  $(gitNeedPull) -eq 1 ]]
+		then
+			${GIT} pull || die "Cannot pull ${GIT_FOLDER}"
+			gitCheckForAutoConf $GIT_FOLDER
+		fi
+		popd
+	else
+		${GIT} clone ${GIT_URL} ${GIT_FOLDER}|| die "Cannot clone ${GIT_FOLDER}"
+		gitCheckForAutoConf $GIT_FOLDER
+	fi
+	
+	
+}
 
 download() {
 	for url in \
 		${LZO_URL} \
-		${OPENSSL_URL} \
-		${PKCS11_HELPER_URL} \
-		${TAP_WINDOWS_URL} \
-		${OPENVPN_URL} \
-		${OPENVPN_GUI_URL};
+		${TAP_WINDOWS_URL}
+#		${OPENVPN_GUI_URL};
 		do
 		download1 "${url}"
 	done
+	
+	for folder in \
+	"${!GIT_FOLDERS[@]}";
+	do 
+		gitDownload ${GIT_FOLDERS["$folder"]} "${SOURCESROOT}/${folder}"
+	done
 
-	if [ "$(ls "${SOURCESROOT}" | wc -l | sed 's/[ \t]//g')" != 6 ]; then
+	if [ "$(ls "${SOURCESROOT}" | wc -l | sed 's/[ \t]//g')" != 7 ]; then
 		die "sources is unclean."
-	fi
+	fi	
 }
 
 create_layout() {
@@ -134,31 +177,39 @@ create_layout() {
 extract() {
 	local f
 
-	for f in "${SOURCESROOT}"/*; do
-		local extract=""
-		echo "Extract '$f'"
-		case "${f}" in
-			*.gz)
-				extract="gunzip -c"
-			;;
-			*.bz2)
-				extract="bunzip2 -c"
-			;;
-			*.lzma)
-				extract="unlzma"
-			;;
-			*.zip)
-				extract="unzip"
-			;;
-			*)
-				extract="cat"
-			;;
-		esac
-		if [ "${extract}" = "unzip" ]; then
-			(cd "${BUILDROOT}" && unzip "${f}") || die "Extract '${f}'"
-		else
-			${extract} < "${f}" | ( cd "${BUILDROOT}" && tar -xf - ) || die "Extract '${f}'"
+	for f in "${SOURCESROOT}"/*.*; do
+		if [ -f $f ]
+		then
+			local extract=""
+			echo "Extract '$f'"
+			case "${f}" in
+				*.gz | *.tgz)
+					extract="gunzip -c"
+				;;
+				*.bz2)
+					extract="bunzip2 -c"
+				;;
+				*.lzma)
+					extract="unlzma"
+				;;
+				*.zip)
+					extract="unzip"
+				;;
+				*)
+					extract="cat"
+				;;
+			esac
+			if [ "${extract}" = "unzip" ]; then
+				(cd "${BUILDROOT}" && unzip "${f}") || die "Extract '${f}'"
+			else
+				${extract} < "${f}" | ( cd "${BUILDROOT}" && tar -xf - ) || die "Extract '${f}'"
+			fi
 		fi
+	done
+	for folder in \
+	"${!GIT_FOLDERS[@]}";
+	do 
+		cp -r  ${SOURCESROOT}/${folder}  ${BUILDROOT}/${folder} 
 	done
 
 	for f in "${PATCHDIR}"/*.patch "${PATCHDIR}"/*.sh; do
@@ -205,30 +256,63 @@ build_dep() {
 			|| die "Cannot create depcache install root at: ${INSTALL_ROOT}'"
 	fi
 
-	if [ -n "${USE_DEP_CACHE}" ]; then
-		depcache_extract openssl
-	else
-		echo "Build openssl"
-		cd "${BUILDROOT}/openssl"* || die "cd openssl"
+#	if [ -n "${USE_DEP_CACHE}" ]; then
+#		depcache_extract openssl
+#	else
+#		echo "Build openssl"
+#		cd "${BUILDROOT}/openssl"* || die "cd openssl"
 
-		./Configure --prefix="/${TARGET_ROOT}" --cross-compile-prefix=${CHOST:+${CHOST}-} \
-			$(empty_ifelse "${DO_STATIC}" shared no-dso) \
-			$(CHOST="${VIRTUAL_CHOST}" "${SCRIPTROOT}/gentoo.config-0.9.8") \
-			${CFLAGS} ${LDFLAGS} \
-			no-multilib \
-			no-capieng \
-			--openssldir=/etc/ssl \
-			--libdir=/lib \
-			${EXTRA_OPENSSL_CONFIG} \
-			|| die "Configure openssl"
-		[ -n "${BUILD_FOR_WINDOWS}" ] && perl util/mkdef.pl crypto ssl NT update
-		[ -z "${OPENSSL_SKIP_DEPEND}" ] && ${MAKE} depend
-		${MAKE} install INSTALL_PREFIX="${INSTALL_ROOT}" INSTALLTOP="/" MANDIR="/tmp" \
-			|| die "make openssl"
-		rm -fr "${INSTALL_ROOT}/tmp"
+#		./Configure --prefix="/${TARGET_ROOT}" --cross-compile-prefix=${CHOST:+${CHOST}-} \
+#			$(empty_ifelse "${DO_STATIC}" shared no-dso) \
+#			$(CHOST="${VIRTUAL_CHOST}" "${SCRIPTROOT}/gentoo.config-0.9.8") \
+#			${CFLAGS} ${LDFLAGS} \
+#			no-multilib \
+#			no-capieng \
+#			--openssldir=/etc/ssl \
+#			--libdir=/lib \
+#			${EXTRA_OPENSSL_CONFIG} \
+#			|| die "Configure openssl"
+#		[ -n "${BUILD_FOR_WINDOWS}" ] && perl util/mkdef.pl crypto ssl NT update
+#		[ -z "${OPENSSL_SKIP_DEPEND}" ] && ${MAKE} depend
+#		${MAKE} install INSTALL_PREFIX="${INSTALL_ROOT}" INSTALLTOP="/" MANDIR="/tmp" \
+#			|| die "make openssl"
+#		rm -fr "${INSTALL_ROOT}/tmp"
+#		fixup_la
+
+#		[ -n "${SAVE_DEP_CACHE}" ] && depcache_save openssl
+#	fi
+
+#	if [ -n "${USE_DEP_CACHE}" ]; then
+#		depcache_extract polarssl
+#	else
+#		echo "Build polarssl without POLARSSL_PKCS11_C"
+#		cd "${BUILDROOT}/polarssl"* || die "cd polarssl"
+#		scripts/config.pl unset POLARSSL_PKCS11_C
+#		${MAKE} ${MAKEOPTS} lib ${EXTRA_POLARSSL_MAKE} CC=${CHOST}-gcc \
+#		$(empty_ifelse "${DO_STATIC}" "SHARED=true" "") \
+#		  || die "make polarssl"
+#		${MAKE} install DESTDIR="${INSTALL_ROOT}" \
+#		  || die "make install polarssl"
+
+#		fixup_la
+
+#		[ -n "${SAVE_DEP_CACHE}" ] && depcache_save polarssl
+#	fi
+
+	if [ -n "${USE_DEP_CACHE}" ]; then
+		depcache_extract polarssl
+	else
+		echo "Build polarssl without POLARSSL_PKCS11_C"
+		cd "${BUILDROOT}/polarssl"* || die "cd polarssl"
+		./configure ${CONFIGOPTS}  \
+			$(empty_ifelse "${DO_STATIC}" --enable-shared --disable-shared) \
+			|| die "Configure polarssl"
+		${MAKE} ${MAKEOPTS} ${MAKE_AUTOCONF_INSTALL_TARGET} DESTDIR="${INSTALL_ROOT}" \
+			|| die "make polarssl"
+
 		fixup_la
 
-		[ -n "${SAVE_DEP_CACHE}" ] && depcache_save openssl
+		[ -n "${SAVE_DEP_CACHE}" ] && depcache_save polarssl
 	fi
 
 
@@ -237,6 +321,7 @@ build_dep() {
 	else
 		echo "Build lzo"
 		cd "${BUILDROOT}/lzo"* || die "cd lzo"
+		cp "${SCRIPTROOT}"/config.guess ./
 		./configure ${CONFIGOPTS} ${EXTRA_LZO_CONFIG} \
 			$(empty_ifelse "${DO_STATIC}" --enable-shared --disable-shared) \
 			|| die "Configure lzo"
@@ -247,25 +332,77 @@ build_dep() {
 
 		[ -n "${SAVE_DEP_CACHE}" ] && depcache_save lzo
 	fi
+	
+	if [ -n "${USE_DEP_CACHE}" ]; then
+		depcache_extract snappy
+	else
+		echo "Build snappy"
+		cd "${BUILDROOT}/${SNAPPY_GIT_FOLDER}" || die "cd snappy"
+		./configure ${CONFIGOPTS} ${EXTRA_SNAPPY_CONFIG} \
+			$(empty_ifelse "${DO_STATIC}" --enable-shared --disable-shared) \
+			--with-gflags=no \
+			|| die "Configure snappy"
+		${MAKE} ${MAKEOPTS} ${MAKE_AUTOCONF_INSTALL_TARGET} DESTDIR="${INSTALL_ROOT}" \
+			|| die "make snappy"
+
+		fixup_la
+
+		[ -n "${SAVE_DEP_CACHE}" ] && depcache_save snappy
+	fi
 
 	if [ -z "${DO_STATIC}" ]; then
 	  if [ -n "${USE_DEP_CACHE}" ]; then
 		depcache_extract pkcs11-helper
 	  else
 		echo "Build pkcs11-helper"
-		cd "${BUILDROOT}/pkcs11-helper"* || die "cd pkcs11-helper"
+		cd "${BUILDROOT}/${PKCS11_HELPER_GIT_FOLDER}" || die "cd pkcs11-helper"	
 		./configure ${CONFIGOPTS} ${EXTRA_PKCS11_HELPER_CONFIG} \
 			--disable-crypto-engine-gnutls \
 			--disable-crypto-engine-nss \
-			OPENSSL_CFLAGS="${OPENSSL_CRYPTO_CFLAGS}" \
-			OPENSSL_LIBS="${OPENSSL_CRYPTO_LIBS}" \
+			--disable-openssl \
+			--disable-crypto-engine-openssl \
 			|| die "Configure pkcs11-helper"
 		${MAKE} ${MAKEOPTS} ${MAKE_AUTOCONF_INSTALL_TARGET} DESTDIR="${INSTALL_ROOT}" \
 			|| die "make pkcs11-helper"
 
 		[ -n "${SAVE_DEP_CACHE}" ] && depcache_save pkcs11-helper
 	  fi
+	
+#		if [ -n "${USE_DEP_CACHE}" ]; then
+#			depcache_extract polarssl-pkcs
+#		else
+#			echo "Build polarssl"
+#			cd "${BUILDROOT}/polarssl"* || die "cd polarssl"
+#			${MAKE} clean || die "Can't clean polarssl"
+#			./scripts/config.pl set POLARSSL_PKCS11_C
+#			${MAKE} ${MAKEOPTS} lib ${EXTRA_POLARSSL_MAKE} CFLAGS=${PKCS11_HELPER_CFLAGS} LDFLAGS=${PKCS11_HELPER_LIBS} CC=${CHOST}-gcc \
+#			$(empty_ifelse "${DO_STATIC}" "SHARED=true" "SHARED=false") \
+#			  || die "make polarssl"
+#			${MAKE} install DESTDIR="${INSTALL_ROOT}" \
+#			  || die "make install polarssl"
+#			fixup_la
+
+#			[ -n "${SAVE_DEP_CACHE}" ] && depcache_save polarssl-pkcs
+#		fi
+		if [ -n "${USE_DEP_CACHE}" ]; then
+			depcache_extract polarssl-pkcs
+		else
+			echo "Build polarssl"
+			cd "${BUILDROOT}/polarssl"* || die "cd polarssl"
+			${MAKE} clean || die "Can't clean polarssl"			
+			./configure ${CONFIGOPTS}  --enable-pkcs11 \
+			$(empty_ifelse "${DO_STATIC}" --enable-shared --disable-shared) \
+			|| die "Configure polarssl"
+		${MAKE} ${MAKEOPTS} ${MAKE_AUTOCONF_INSTALL_TARGET} DESTDIR="${INSTALL_ROOT}" \
+			|| die "make polarssl"
+			fixup_la
+
+			[ -n "${SAVE_DEP_CACHE}" ] && depcache_save polarssl-pkcs
+		fi
+	
 	fi
+	
+	
 
 	echo "tap-windows"
 	cp "${BUILDROOT}"/tap-windows-*/include/* "${OPENVPN_ROOT}/include" || die "tap-windows copy"
@@ -281,11 +418,12 @@ build_openvpn() {
 	fixup_la
 
 	echo "Build openvpn"
-	cd "${BUILDROOT}/openvpn-${OPENVPN_VERSION}" || die "cd openvpn"
+	cd "${BUILDROOT}/${OPENVPN_GIT_FOLDER}" || die "cd openvpn"
 	./configure ${CONFIGOPTS} ${EXTRA_OPENVPN_CONFIG} \
 		$(empty_ifelse "${DO_STATIC}" --enable-pkcs11 --disable-plugins) \
 		--enable-lzo \
 		--with-special-build="${SPECIAL_BUILD}" \
+		--with-crypto-library=polarssl \
 		|| die "Configure openvpn"
 	${MAKE} ${MAKEOPTS} ${MAKE_AUTOCONF_INSTALL_TARGET} DESTDIR="${OPENVPN_ROOT}" || die "make openvpn"
 
@@ -371,7 +509,7 @@ main() {
 	build_dep
 	if [ -z "${DO_ONLY_DEPS}" ]; then
 		build_openvpn
-		[ -n "${BUILD_FOR_WINDOWS}" ] && build_openvpn_gui
+		#[ -n "${BUILD_FOR_WINDOWS}" ] && build_openvpn_gui
 		copy_docs
 		copy_sources
 		clean_empty_dirs
@@ -410,14 +548,20 @@ OPENVPN_ROOT="${IMAGEROOT}/openvpn"
 
 if [ -z "${DO_NO_STRIP}" ]; then
 	MAKE_AUTOCONF_INSTALL_TARGET="install-strip"
+	CMAKE_AUTOCONF_INSTALL_TARGET="install/strip"
 else
 	MAKE_AUTOCONF_INSTALL_TARGET="install"
+	CMAKE_AUTOCONF_INSTALL_TARGET="install"
 fi
 
-export OPENSSL_CRYPTO_CFLAGS="-I${OPENVPN_ROOT}/include"
-export OPENSSL_CRYPTO_LIBS="-L${OPENVPN_ROOT}/lib -lcrypto"
-export OPENSSL_SSL_CFLAGS="-I${OPENVPN_ROOT}/include"
-export OPENSSL_SSL_LIBS="-L${OPENVPN_ROOT}/lib -lssl"
+#export OPENSSL_CRYPTO_CFLAGS="-I${OPENVPN_ROOT}/include"
+#export OPENSSL_CRYPTO_LIBS="-L${OPENVPN_ROOT}/lib -lcrypto"
+#export OPENSSL_SSL_CFLAGS="-I${OPENVPN_ROOT}/include"
+#export OPENSSL_SSL_LIBS="-L${OPENVPN_ROOT}/lib -lssl"
+export POLARSSL_CFLAGS="-I${OPENVPN_ROOT}/include"
+export POLARSSL_LIBS="-L${OPENVPN_ROOT}/lib -lpolarssl"
+export SNAPPY_CFLAGS="-I${OPENVPN_ROOT}/include"
+export SNAPPY_LIBS="-L${OPENVPN_ROOT}/lib -lsnappy"
 export LZO_CFLAGS="-I${OPENVPN_ROOT}/include"
 export LZO_LIBS="-L${OPENVPN_ROOT}/lib -llzo2"
 export PKCS11_HELPER_CFLAGS="-I${OPENVPN_ROOT}/include"
