@@ -1,18 +1,18 @@
 diff --git a/configure.ac b/configure.ac
-index 9132468..ccd8aa0 100644
+index 9132468..dfc7d87 100644
 --- a/configure.ac
 +++ b/configure.ac
 @@ -329,6 +329,7 @@ case "$host" in
-                AC_DEFINE_UNQUOTED([TARGET_PREFIX], ["W"], [Target prefix])
-                CPPFLAGS="${CPPFLAGS} -DWIN32_LEAN_AND_MEAN"
-                CPPFLAGS="${CPPFLAGS} -DNTDDI_VERSION=NTDDI_WINXP -D_WIN32_WINNT=_WIN32_WINNT_WINXP"
-+               LDFLAGS="${LDFLAGS} -static-libgcc -static-libstdc++"
-                WIN32=yes
-                ;;
-        *-*-dragonfly*)
+ 		AC_DEFINE_UNQUOTED([TARGET_PREFIX], ["W"], [Target prefix])
+ 		CPPFLAGS="${CPPFLAGS} -DWIN32_LEAN_AND_MEAN"
+ 		CPPFLAGS="${CPPFLAGS} -DNTDDI_VERSION=NTDDI_WINXP -D_WIN32_WINNT=_WIN32_WINNT_WINXP"
++		LDFLAGS="${LDFLAGS} -static-libgcc -static-libstdc++"
+ 		WIN32=yes
+ 		;;
+ 	*-*-dragonfly*)
 @@ -503,6 +504,12 @@ AC_CHECK_TYPE(
-        ,
-        [[${SOCKET_INCLUDES}]]
+ 	,
+ 	[[${SOCKET_INCLUDES}]]
  )
 +AC_CHECK_MEMBER(
 +       [struct in_pktinfo.ipi_spec_dst],

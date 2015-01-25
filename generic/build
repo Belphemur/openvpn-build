@@ -112,7 +112,7 @@ gitCheckForAutoConf() {
 gitDownload() {
 	GIT_URL=${1}
 	GIT_FOLDER=${2}
-	echo "Cloning ${GIT_URL}"
+	echo "Cloning/Pulling from ${GIT_URL}"
 	if [ -d "${GIT_FOLDER}/.git" ] 
 	then
 		pushd ${GIT_FOLDER}
